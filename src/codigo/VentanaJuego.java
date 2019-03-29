@@ -5,9 +5,12 @@
  */
 package codigo;
 
+import java.applet.AudioClip;
 import java.awt.Color;
+import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.Image;
+import java.awt.Label;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
@@ -17,6 +20,8 @@ import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.imageio.ImageIO;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.Clip;
 import javax.swing.Timer;
 
 /**
@@ -24,14 +29,15 @@ import javax.swing.Timer;
  * @author Maria
  */
 public class VentanaJuego extends javax.swing.JFrame {
-
-    static int ANCHOPANTALLA = 600;
-    static int ALTOPANTALLA = 450;
+    public static Label lbl_puntuacion = new Label();//puntuacion
+    static int ANCHOPANTALLA = 800;
+    static int ALTOPANTALLA = 600;
 
     //numero de marcianos que van a aparecer
-    int filas = 8;
-    int columnas = 10;
-
+    int filas = 4;
+    int columnas = 7;
+    int puntuacion = 0;
+    
     BufferedImage buffer = null;
 
     Nave miNave = new Nave();
@@ -39,11 +45,15 @@ public class VentanaJuego extends javax.swing.JFrame {
     //Marciano miMarciano = new Marciano();
     Marciano[][] listaMarcianos = new Marciano[filas][columnas];
     boolean direccionMarcianos = false;
+    boolean gameOver = false;
     //el contador sirve para decidir qué imagen del marciano toca poner
     int contador = 0;
     //imagen para cargar el spritesheet con todos los sprites del juego
     BufferedImage plantilla = null;
     Image [][] imagenes ;
+    Image [][] imagenesPistola;
+    Image [][] imagenesBala;
+    Image fondo;
     
     Timer temporizador = new Timer(10, new ActionListener() {
         @Override
@@ -57,6 +67,27 @@ public class VentanaJuego extends javax.swing.JFrame {
      */
     public VentanaJuego() {
         initComponents();
+        setTitle("Space Invaders");
+        setLocationRelativeTo(null);
+        Font font1;
+        Color color1;
+        Color color2;
+        font1 = new Font("Courier New", Font.BOLD, 40);
+        color1 = new Color(255, 255, 255);
+        color2 = new Color(0, 0, 0);
+        lbl_puntuacion.setFont(font1);
+        lbl_puntuacion.setForeground(color1);
+        lbl_puntuacion.setBackground(color2);
+        // 1º Ancho
+        // 2º alto
+        // 3º tamaño de ancho de la caja del numero
+        // 4º tamaño del alto de la caja del numero
+        lbl_puntuacion.setBounds(700, 500, 100, 45);
+        lbl_puntuacion.setText("0");
+        jPanel1.add(lbl_puntuacion);
+        
+        reproduce ("/sonidos/babyshark.wav");
+        
         //para cargar el archivo de imagenes: 
         // 1º, el nombre del archivo
         // 2º filas que tiene el spritesheet
@@ -64,9 +95,17 @@ public class VentanaJuego extends javax.swing.JFrame {
         // 4º lo que mide de ancho el sprite en el spritesheet
         // 5º lo que mide de alto el sprite en el spritesheet
         // 6º para cambiar el tamaño de los sprites
-        imagenes = cargaImagenes("/imagenes/invaders2.png", 5, 4, 64, 64, 2);
+        imagenes = cargaImagenes("/imagenes/pajaro.png", 1, 2, 320, 320, 5);
+        imagenesPistola = cargaImagenes("/imagenes/zorro.png", 1, 1, 320, 320, 4); 
+        imagenesBala = cargaImagenes("/imagenes/bala.png", 1, 1, 126, 370, 5);
         
-        miDisparo.imagen = imagenes[3][2];
+        try{
+          fondo = ImageIO.read(getClass().getResource("/imagenes/fondo.jpg"));
+      }
+      catch (IOException ex){
+      
+      }
+        miDisparo.imagen = imagenesBala[0][0];
         setSize(ANCHOPANTALLA, ALTOPANTALLA);
         buffer = (BufferedImage) jPanel1.createImage(ANCHOPANTALLA, ALTOPANTALLA);
         buffer.createGraphics();
@@ -74,7 +113,7 @@ public class VentanaJuego extends javax.swing.JFrame {
         temporizador.start();
 
         //inicializo la posición inicial de la nave
-        miNave.imagen = imagenes[4][2];
+        miNave.imagen = imagenesPistola[0][0];
         miNave.x = ANCHOPANTALLA / 2 - miNave.imagen.getWidth(this) / 2;
         miNave.y = ALTOPANTALLA - miNave.imagen.getHeight(this) - 40;
         
@@ -84,16 +123,34 @@ public class VentanaJuego extends javax.swing.JFrame {
         //1 parametro: numero de la fila de marcianos que estoy creando
         //2º parametro: fila dentro del spritesheet del marciano que quiero pintar
         //3º parametro: columna dentro del spritesheet del marciano que quiero pintar
-        creaFilaDeMarcianos(0, 0, 2);
-        creaFilaDeMarcianos(1, 2, 2);
-        creaFilaDeMarcianos(2, 4, 0);
-        creaFilaDeMarcianos(3, 0, 2);
-        creaFilaDeMarcianos(4, 0, 2);
-        creaFilaDeMarcianos(5, 0, 2);
-        creaFilaDeMarcianos(6, 0, 2);
-        creaFilaDeMarcianos(7, 0, 2);        
+        creaFilaDeMarcianos(0, 0, 0);
+        creaFilaDeMarcianos(1, 0, 0);
+        creaFilaDeMarcianos(2, 0, 0);
+        creaFilaDeMarcianos(3, 0, 0);
+//        creaFilaDeMarcianos(4, 0, 2);
+//        creaFilaDeMarcianos(5, 0, 2);
+//        creaFilaDeMarcianos(6, 0, 2);
+//        creaFilaDeMarcianos(7, 0, 2);        
     }
+  private void finPartida (Graphics2D muerto)throws IOException{
+      try{
+          Image gameOver1 = ImageIO.read(getClass().getResource("/imagenes/gameOver.gif"));
+          muerto.drawImage(gameOver1, 0, 0,ANCHOPANTALLA,ALTOPANTALLA,null);
+      }
+      catch (IOException ex){
+      
+      }
+  }
   
+  private void ganaPartida (Graphics2D win)throws IOException{
+      try{
+          Image victoria = ImageIO.read(getClass().getResource("/imagenes/win.jpg"));
+          win.drawImage(victoria, 0, 0,ANCHOPANTALLA,ALTOPANTALLA,null);
+      }
+      catch (IOException ex){
+      
+      }
+  }
     
   private void creaFilaDeMarcianos(int numeroFila, int spriteFila, int spriteColumna){
       for (int j = 0; j < columnas; j++) {
@@ -105,6 +162,23 @@ public class VentanaJuego extends javax.swing.JFrame {
       }
   }  
     
+  private void reproduce (String cancion){
+      try{
+          Clip clip = AudioSystem.getClip();
+          clip.open (AudioSystem.getAudioInputStream(getClass().getResource(cancion)));
+          clip.loop(0);
+          Thread one = new Thread(){
+              public void run(){
+                  while (clip.getFramePosition()<clip.getFrameLength())
+                      Thread.yield();
+              }
+          };
+          one.start();
+      }catch (Exception e) {
+          
+      }
+  }
+  
     /*
     este método va a servir para crear el array de imagenes con todas las imagenes
     del spritesheet. Devolverá un array de dos dimensiones con las imágenes colocadas
@@ -145,17 +219,38 @@ public class VentanaJuego extends javax.swing.JFrame {
         //primero borro todo lo que hay en el buffer
         contador++;
         Graphics2D g2 = (Graphics2D) buffer.getGraphics();
+        if(!gameOver){
+            
         g2.setColor(Color.BLACK);
         g2.fillRect(0, 0, ANCHOPANTALLA, ALTOPANTALLA);
-
+        g2.drawImage(fondo, 0, 0,ANCHOPANTALLA,ALTOPANTALLA,null);
         ///////////////////////////////////////////////////////
         //redibujaremos aquí cada elemento
         g2.drawImage(miDisparo.imagen, miDisparo.x, miDisparo.y, null);
         g2.drawImage(miNave.imagen, miNave.x, miNave.y, null);
+        
         pintaMarcianos(g2);
         chequeaColision();
         miNave.mueve();
         miDisparo.mueve();
+        
+        if(puntuacion == 140){
+             try {
+                ganaPartida (g2);
+            }
+            catch(IOException ex){
+                
+            }
+        }
+        }
+        else {
+            try {
+                finPartida (g2);
+            }
+            catch(IOException ex){
+                
+            }
+        }
         /////////////////////////////////////////////////////////////
         //*****************   fase final, se dibuja ***************//
         //*****************   el buffer de golpe sobre el Jpanel***//
@@ -168,11 +263,16 @@ public class VentanaJuego extends javax.swing.JFrame {
     private void chequeaColision(){
         Rectangle2D.Double rectanguloMarciano = new Rectangle2D.Double();
         Rectangle2D.Double rectanguloDisparo = new Rectangle2D.Double();
+        Rectangle2D.Double rectanguloMiNave = new Rectangle2D.Double();
         
         rectanguloDisparo.setFrame( miDisparo.x, 
                                     miDisparo.y,
                                     miDisparo.imagen.getWidth(null),
                                     miDisparo.imagen.getHeight(null));
+        rectanguloMiNave.setFrame( miNave.x, 
+                                    miNave.y,
+                                    miNave.imagen.getWidth(null),
+                                    miNave.imagen.getHeight(null));
         
         for (int i = 0; i < filas; i++) {
             for (int j = 0; j < columnas; j++) {
@@ -187,6 +287,11 @@ public class VentanaJuego extends javax.swing.JFrame {
                         miDisparo.posicionaDisparo(miNave);
                         miDisparo.y = 1000;
                         miDisparo.disparado = false;
+                        puntuacion = puntuacion +5;
+                        lbl_puntuacion.setText("" + puntuacion);
+                    }
+                    if(rectanguloMarciano.intersects(rectanguloMiNave)){
+                        gameOver = true;
                     }
                 }
             }
@@ -196,6 +301,7 @@ public class VentanaJuego extends javax.swing.JFrame {
     private void cambiaDireccionMarcianos() {
         for (int i = 0; i < filas; i++) {
             for (int j = 0; j < columnas; j++) {
+                listaMarcianos[i][j].y +=10;
                 listaMarcianos[i][j].setvX(listaMarcianos[i][j].getvX()* -1);
             }
         }
@@ -293,6 +399,7 @@ public class VentanaJuego extends javax.swing.JFrame {
             case KeyEvent.VK_SPACE:
                 miDisparo.posicionaDisparo(miNave);
                 miDisparo.disparado = true;
+                reproduce ("/sonidos/disparo.wav");
                 break;
         }
     }//GEN-LAST:event_formKeyPressed
